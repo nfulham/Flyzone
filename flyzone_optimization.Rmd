@@ -1,0 +1,148 @@
+---
+title: "Flyzone Optimization"
+author: "Nate Fulham"
+date: "2023-08-01"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(magrittr)
+library(gtools)
+```
+
+```{r reference for rating information for shapes}
+ref_info <- list(
+  shape = c("Triangle", "Parallelogram", "Trapezoid"),
+  shape_abbr = c("t", "p", "z"),
+  str = c(4, 4, 5),
+  flex = c(2, 5, 8),
+  cost = c(6, 9, 15),
+  cost_multipliers = c(
+    m = 1,
+    d = .5),
+  budget = 70
+)
+```
+
+```{r scoring function}
+
+# This is the basic scoring function for either player
+score_basic <- function(str, flex, cost, cost_multiplier, budget) {
+  return(str + flex + ((budget - cost) * cost_multiplier))
+}
+
+# Not much special here, just calculates the basics before sending it to score_basic
+score_player <- function(shape_vec, role, ref = ref_info) {
+  
+  if (role == "d" | role == "m") {} else {
+    stop("role is not 'd' fr designer or 'm' for manufacturer. Please specifiy to calculate scores:")
+  }
+  
+  basic_score_vec <- c(
+    strength = sum(ref[["str"]] * shape_vec), # calculating strength is based on ref_info
+    flexibility = sum(ref[["flex"]] * shape_vec), # calculating flexibility is based on ref_info
+    cost = sum(ref[["cost"]] * shape_vec) # calculating cost is based on ref_info
+  )
+  
+  cost_multiply <- ref_info[["cost_multipliers"]][[role]]
+  budge <- ref_info[["budget"]]
+  
+  score_vec <- c(
+    basic_score_vec,
+    player_score = score_basic(basic_score_vec[["strength"]],
+                               basic_score_vec[["flexibility"]],
+                               basic_score_vec[["cost"]],
+                               cost_multiply,
+                               budge
+                               ))
+  
+  return(score_vec)
+}
+```
+
+```{r all shape permuatations}
+n_shape <- 0:7
+max_shapesum <- max(n_shape)
+min_shapesum <- 5
+
+exclusion_fn <- function(shape_vec, max = max_shapesum, min = min_shapesum) {
+  if (sum(shape_vec) > max) {return(F)} # don't exceed shape maximum
+  if (sum(shape_vec) < min) {return(F)} # you need at least 4 to fill in the figure
+  return(T)
+}
+
+shape_perms <- gtools::permutations(length(n_shape), 3, v = n_shape, repeats.allowed = T) %>% 
+  t %>% as.data.frame %>% 
+  extract(map_lgl(., exclusion_fn))
+```
+
+```{r calculate scores}
+# This determines scores for each player for each combination of shapes used to fill in the outline of the plane
+all_scores <- cbind(shape_perms %>% t %>% as.data.frame %>% set_colnames(c("t", "p", "z")), 
+                    # calculates designer scores for each permutation
+                    map2_dfr(shape_perms, rep("d", ncol(shape_perms)), score_player) %>% 
+                      rename(d = player_score), 
+                    # calculates manufacturer scores for each permutation
+                    map2_dfr(shape_perms, rep("m", ncol(shape_perms)), score_player) %>% 
+                      rename(m = player_score) %>% dplyr::select(m)) %>% 
+  # also calculate joint score, the ratio between the two, and the distance from 1
+  mutate(joint_score = d + m,
+         ratio = d/m,
+         ratio_dist_1 = abs(1 - ratio),
+         id = paste0(t,p,z))
+
+cors <- cor(all_scores %>% dplyr::select(where(is.numeric)))
+```
+
+```{r check integrative potential}
+# this kind of plot gives a sense of what outomes are likely possible given at least the constraints we know
+ggplot(all_scores, aes(d, m)) + geom_point(alpha = .4) +
+  labs(title = "Relationship between role scores") +
+  xlab("Designer Score") +
+  ylab("Manufacturing Score")
+```
+
+```{r}
+View(cors <- cor(all_scores))
+```
+
+
+```{r test all ratios}
+# I made these functions to test a bunch of different values for the cost measure to try to optimize for something very integrative. It essentially just runs the same thing as all the above but for different cost/budget numbers
+change_ref_info <- function(multiplier, ref = ref_info) {
+  ref_info[["cost"]] <- ref_info[["cost"]] * multiplier
+  ref_info[["budget"]] <- ref_info[["budget"]] * multiplier
+  return(ref_info)
+}
+
+calculate_scores <- function(new_ref_df, perm_df = shape_perms) {
+  score_df <- cbind(perm_df %>% t %>% as.data.frame %>% set_colnames(c("t", "p", "r", "z")),
+                    map2_dfr(perm_df, rep("d", ncol(perm_df)), 
+                             ~ score_player(shape_vec = .x, role = .y, ref = new_ref_df)) %>% 
+                      rename(d = player_score), 
+                    map2_dfr(perm_df, rep("m", ncol(perm_df)), 
+                             ~ score_player(shape_vec = .x, role = .y, ref = new_ref_df)) %>% 
+                      rename(m = player_score) %>% dplyr::select(m)) %>% 
+    mutate(joint_score = d + m,
+           ratio = d/m,
+           ratio_dist_1 = abs(1 - ratio))
+  return(score_df)
+}
+
+
+test_dfs <- map(c(seq(.1, 1, .1), seq(2, 10, 1)), change_ref_info) 
+test <- test_dfs %>% 
+  map(calculate_scores)
+```
+
+```{r}
+# plotting all of them. Looks like the 9th one is the best! And it seems to be somewhat accessible numbers-wise, hopefully remaining not very taxing on participants. 
+plot_scores <- function(df) {
+  ggplot(df, aes(d, m)) + geom_point(alpha = .3)
+}
+
+map(test, plot_scores)
+```
+
