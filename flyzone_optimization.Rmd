@@ -70,6 +70,7 @@ min_shapesum <- 5
 exclusion_fn <- function(shape_vec, max = max_shapesum, min = min_shapesum) {
   if (sum(shape_vec) > max) {return(F)} # don't exceed shape maximum
   if (sum(shape_vec) < min) {return(F)} # you need at least 4 to fill in the figure
+  if (shape_vec[1] < 1) {return(F)}
   return(T)
 }
 
@@ -118,7 +119,7 @@ change_ref_info <- function(multiplier, ref = ref_info) {
 }
 
 calculate_scores <- function(new_ref_df, perm_df = shape_perms) {
-  score_df <- cbind(perm_df %>% t %>% as.data.frame %>% set_colnames(c("t", "p", "r", "z")),
+  score_df <- cbind(perm_df %>% t %>% as.data.frame %>% set_colnames(c("t", "p", "z")),
                     map2_dfr(perm_df, rep("d", ncol(perm_df)), 
                              ~ score_player(shape_vec = .x, role = .y, ref = new_ref_df)) %>% 
                       rename(d = player_score), 
