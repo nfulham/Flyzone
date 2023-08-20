@@ -1,0 +1,43 @@
+---
+title: "Pilot analyses"
+author: "Nate Fulham"
+date: "2023-08-17"
+output: html_document
+---
+
+# 0: packages
+```{r packages}
+package.names <- c(
+  #general
+  "tidyverse",
+  "psych",
+  "purrr",
+  "data.table",
+  #analysis
+  "magrittr",
+  "tidySEM",
+  "lavaan",
+  #dataviz
+  "ggplot2",
+  "formatR",
+  "xtable",
+  "stargazer"
+)
+
+check.packages <- function(package) {
+  if (!require(package, character.only = T)) {
+    install.packages(package)
+    library(package, character.only = T)
+  } else {
+    library(package, character.only = T)
+  }
+}
+
+quietly(lapply(package.names, check.packages))
+```
+
+# 1: functions
+```{r functions}
+
+```
+
