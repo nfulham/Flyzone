@@ -99,6 +99,7 @@ all_scores <- cbind(shape_perms %>% t %>% as.data.frame %>% set_colnames(c("t", 
          id = paste0(t,p,z))
 
 cors <- cor(all_scores %>% dplyr::select(where(is.numeric)))
+cors
 ```
 
 ```{r check integrative potential}
@@ -108,11 +109,6 @@ ggplot(all_scores, aes(d, m)) + geom_point(alpha = .4) +
   xlab("Designer Score") +
   ylab("Manufacturing Score")
 ```
-
-```{r}
-View(cors <- cor(all_scores))
-```
-
 
 ```{r test all ratios}
 # I made these functions to test a bunch of different values for the cost measure to try to optimize for something very integrative. It essentially just runs the same thing as all the above but for different cost/budget numbers
