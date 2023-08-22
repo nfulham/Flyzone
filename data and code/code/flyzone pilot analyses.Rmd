@@ -33,7 +33,7 @@ check.packages <- function(package) {
   }
 }
 
-quietly(lapply(package.names, check.packages))
+lapply(package.names, check.packages)
 ```
 
 # 1: functions

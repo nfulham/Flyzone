@@ -72,9 +72,9 @@ min_shapesum <- 4
 exclusion_fn <- function(shape_vec, max = max_shapesum, min = min_shapesum) {
   if (sum(shape_vec) > max) {return(F)} # don't exceed shape maximum
   if (sum(shape_vec) < min) {return(F)} # you need at least 4 to fill in the figure
-  if (shape_vec[1] < 1) {return(F)}
-  if (shape_vec[1] < 2 & any(sum(shape_vec) < 5, shape_vec[3] < 2)) {return(F)}
-  if (shape_vec[3] < 1 & shape_vec[1] < 3) {return(F)} 
+  if (shape_vec[1] < 1) {return(F)} # solutions must include at least 1 triangle
+  if (shape_vec[1] < 2 & any(sum(shape_vec) < 5, shape_vec[3] < 2)) {return(F)} # if there are less than 2 triangles, you need at least 5 shapes and 2 of them need to be trapezoids
+  if (shape_vec[3] < 1 & shape_vec[1] < 3) {return(F)} # if you 
   return(T)
 }
 
