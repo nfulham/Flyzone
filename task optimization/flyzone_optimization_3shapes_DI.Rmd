@@ -16,23 +16,20 @@ library(gtools)
 ref_info <- list(
   shape = c("Triangle", "Parallelogram", "Trapezoid"),
   shape_abbr = c("t", "p", "z"),
-  str = c(4, 6, 5),
-  flex = c(2, 4, 8),
-  cost = c(6, 10, 16),
+  str = c(4, 5, 1),
+  flex = c(1, 5, 7),
+  cost = c(2, 4, 6),
   cost_multipliers = c(
     m = 1,
-    d = .5),
-  rel_val_m = c(0, 0, -3),
-  rel_val_d = c(3, 5, 5),
-  budget = 50
-)
+    d = .5)
+  )
 ```
 
 ```{r scoring function}
 
 # This is the basic scoring function for either player
-score_basic <- function(str = 0, flex = 0, cost, cost_multiplier, budget) {
-  return(str + flex + ((budget - cost) * cost_multiplier))
+score_basic <- function(str = 0, flex = 0, cost, cost_multiplier) {
+  return(str + flex - cost*cost_multiplier)
 }
 
 # Not much special here, just calculates the basics before sending it to score_basic
@@ -57,15 +54,13 @@ score_player_DI <- function(shape_vec, role, ref = ref_info) {
   }
   
   cost_multiply <- ref_info[["cost_multipliers"]][[role]]
-  budge <- ref_info[["budget"]]
-  
+
   if (role == "d") {
     score_vec <- c(
     basic_score_vec,
     player_score = score_basic(flex = basic_score_vec[["flexibility"]],
                                cost = basic_score_vec[["cost"]],
-                               cost_multiplier = cost_multiply,
-                               budget = budge))
+                               cost_multiplier = cost_multiply))
   }
   
   if (role == "m") {
@@ -73,8 +68,7 @@ score_player_DI <- function(shape_vec, role, ref = ref_info) {
     basic_score_vec,
     player_score = score_basic(str = basic_score_vec[["strength"]],
                                cost = basic_score_vec[["cost"]],
-                               cost_multiplier = cost_multiply,
-                               budget = budge))
+                               cost_multiplier = cost_multiply))
   }
   return(score_vec)
 }
@@ -83,8 +77,7 @@ score_player_FI <- function(shape_vec, role, ref = ref_info) {
   out <- score_basic(str = sum(ref[["str"]] * shape_vec),
                      flex = sum(ref[["flex"]] * shape_vec),
                      cost = sum(ref[["cost"]] * shape_vec), 
-                     cost_multiplier = ref[["cost_multipliers"]][role],
-                     budget = ref[["budget"]])
+                     cost_multiplier = ref[["cost_multipliers"]][role])
   return(out)
 }
 ```
@@ -125,13 +118,12 @@ all_scores <- cbind(shape_perms %>% t %>% as.data.frame %>% set_colnames(c("t", 
   mutate(d_FI = map2_dbl(shape_perms, "d", score_player_FI),
          m_FI = map2_dbl(shape_perms, "m", score_player_FI),
          team_score = d_FI + m_FI,
-         team_score_rank = max(rank(team_score))+1 - rank(team_score, ties.method = "min"),
+         team_score_rank = max(rank(team_score))+2 - rank(team_score, ties.method = "max"),
          ratio = d/m,
          ratio_dist_1 = abs(1 - ratio),
          id = paste0(t,p,z))
 
 cors <- cor(all_scores %>% dplyr::select(where(is.numeric)))
-cors
 ```
 
 ```{r check integrative potential}
