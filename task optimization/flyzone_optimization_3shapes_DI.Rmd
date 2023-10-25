@@ -36,7 +36,7 @@ score_basic <- function(str = 0, flex = 0, cost, cost_multiplier, budget) {
 }
 
 # Not much special here, just calculates the basics before sending it to score_basic
-score_player <- function(shape_vec, role, ref = ref_info) {
+score_player_DI <- function(shape_vec, role, ref = ref_info) {
   
   if (role == "d" | role == "m") {} else {
     stop("role is not 'd' fr designer or 'm' for manufacturer. Please specify to calculate scores:")
@@ -46,17 +46,15 @@ score_player <- function(shape_vec, role, ref = ref_info) {
     basic_score_vec <- c(
     flexibility = sum(ref[["flex"]] * shape_vec), # calculating flexibility is based on ref_info
     cost = sum(ref[["cost"]] * shape_vec) # calculating cost is based on ref_info
-  )
+    )
   }
   
   if (role == "m") {
     basic_score_vec <- c(
     strength = sum(ref[["str"]] * shape_vec), # calculating strength is based on ref_info
     cost = sum(ref[["cost"]] * shape_vec) # calculating cost is based on ref_info
-  )
+    )
   }
-  
-  
   
   cost_multiply <- ref_info[["cost_multipliers"]][[role]]
   budge <- ref_info[["budget"]]
@@ -70,16 +68,24 @@ score_player <- function(shape_vec, role, ref = ref_info) {
                                budget = budge))
   }
   
-  if (role = "m") {
+  if (role == "m") {
     score_vec <- c(
     basic_score_vec,
     player_score = score_basic(str = basic_score_vec[["strength"]],
                                cost = basic_score_vec[["cost"]],
                                cost_multiplier = cost_multiply,
-                               budget = budge
-                               ))
+                               budget = budge))
   }
   return(score_vec)
+}
+
+score_player_FI <- function(shape_vec, role, ref = ref_info) {
+  out <- score_basic(str = sum(ref[["str"]] * shape_vec),
+                     flex = sum(ref[["flex"]] * shape_vec),
+                     cost = sum(ref[["cost"]] * shape_vec), 
+                     cost_multiplier = ref[["cost_multipliers"]][role],
+                     budget = ref[["budget"]])
+  return(out)
 }
 ```
 
@@ -102,20 +108,24 @@ exclusion_fn <- function(shape_vec, max = max_shapesum, min = min_shapesum) {
 
 shape_perms <- gtools::permutations(length(n_shape), 3, v = n_shape, repeats.allowed = T) %>% 
   t %>% as.data.frame %>% 
-  extract(map_lgl(., exclusion_fn))
+  extract(map_lgl(., exclusion_fn)) %>% 
+  set_rownames(c("t", "p", "z"))
 ```
 
 ```{r calculate scores}
 # This determines scores for each player for each combination of shapes used to fill in the outline of the plane
 all_scores <- cbind(shape_perms %>% t %>% as.data.frame %>% set_colnames(c("t", "p", "z")), 
                     # calculates designer scores for each permutation
-                    map2_dfr(shape_perms, rep("d", ncol(shape_perms)), score_player) %>% 
+                    map2_dfr(shape_perms, rep("d", ncol(shape_perms)), score_player_DI) %>% 
                       rename(d = player_score), 
                     # calculates manufacturer scores for each permutation
-                    map2_dfr(shape_perms, rep("m", ncol(shape_perms)), score_player) %>% 
+                    map2_dfr(shape_perms, rep("m", ncol(shape_perms)), score_player_DI) %>% 
                       rename(m = player_score) %>% dplyr::select(m)) %>% 
   # also calculate joint score, the ratio between the two, and the distance from 1
-  mutate(joint_score = d + m,
+  mutate(d_FI = map2_dbl(shape_perms, "d", score_player_FI),
+         m_FI = map2_dbl(shape_perms, "m", score_player_FI),
+         team_score = d_FI + m_FI,
+         team_score_rank = max(rank(team_score))+1 - rank(team_score, ties.method = "min"),
          ratio = d/m,
          ratio_dist_1 = abs(1 - ratio),
          id = paste0(t,p,z))
@@ -127,6 +137,11 @@ cors
 ```{r check integrative potential}
 # this kind of plot gives a sense of what outomes are likely possible given at least the constraints we know
 ggplot(all_scores, aes(d, m)) + geom_point(alpha = .4) +
+  labs(title = "Relationship between role scores") +
+  xlab("Designer Score") +
+  ylab("Manufacturing Score")
+
+ggplot(all_scores, aes(d_FI, m_FI)) + geom_point(alpha = .4) +
   labs(title = "Relationship between role scores") +
   xlab("Designer Score") +
   ylab("Manufacturing Score")
